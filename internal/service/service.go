@@ -75,9 +75,10 @@ func (s *GroupService) prepareDatabase(conf *config.Configuration) error {
 		return err
 	}
 
-	confDb := database.DatabaseConfig{}
-	confDb.IP = conf.DatabaseIP
-	confDb.Port = conf.DatabasePort
+	confDb := database.DatabaseConfig{
+		IP:   conf.DatabaseIP,
+		Port: conf.DatabasePort,
+	}
 	err = db.Initialize(confDb)
 	if err != nil {
 		rlog.Error("Cannot connect to database " + err.Error())
@@ -112,16 +113,17 @@ func (s *GroupService) prepareNetwork(conf *config.Configuration) error {
 	s.broker = driversBroker
 
 	callbacks := make(map[string]func(client network.Client, msg network.Message))
-	callbacks["/write/switch/"+s.mac+"/group/setup/config"] = s.onSetup
-	callbacks["/write/switch/"+s.mac+"/group/update/settings"] = s.onUpdate
-	callbacks["/remove/switch/"+s.mac+"/group/update/settings"] = s.onRemove
+	callbacks["/write/switch/group/setup/config"] = s.onSetup
+	callbacks["/write/switch/group/update/settings"] = s.onUpdate
+	callbacks["/remove/switch/group/update/settings"] = s.onRemove
 
-	confDrivers := network.NetworkConfig{}
-	confDrivers.IP = conf.DriversBrokerIP
-	confDrivers.Port = conf.DriversBrokerPort
-	confDrivers.ClientName = clientID
-	confDrivers.Callbacks = callbacks
-	confDrivers.LogLevel = *conf.LogLevel
+	confDrivers := network.NetworkConfig{
+		IP:         conf.DriversBrokerIP,
+		Port:       conf.DriversBrokerPort,
+		ClientName: clientID,
+		Callbacks:  callbacks,
+		LogLevel:   *conf.LogLevel,
+	}
 	err = driversBroker.Initialize(confDrivers)
 	if err != nil {
 		rlog.Error("Cannot connect to broker " + conf.DriversBrokerIP + " error: " + err.Error())

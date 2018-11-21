@@ -262,7 +262,7 @@ func (s *GroupService) setpointLed(group *Group) {
 			rlog.Info("Switch mac is " + s.mac + " and led is connected to switch " + led.SwitchMac + " skip it")
 			continue
 		}
-		urlCmd := "/write/switch/" + s.mac + "/led/update/settings"
+		urlCmd := "/write/switch/led/update/settings"
 		conf := driverled.LedConf{
 			Mac:      led.Mac,
 			Setpoint: &group.Setpoint,
