@@ -91,7 +91,7 @@ func (s *GroupService) prepareDatabase(conf *config.Configuration) error {
 		rlog.Warn("Create DB " + gr.DbStatusName + " err: " + err.Error())
 	}
 
-	err = s.db.CreateTable(gr.DbStatusName, gr.TableStatusName)
+	err = s.db.CreateTable(gr.DbStatusName, gr.TableStatusName, &gr.GroupStatus{})
 	if err != nil {
 		rlog.Warn("Create table ", err.Error())
 	}

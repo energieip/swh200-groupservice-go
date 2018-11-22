@@ -33,12 +33,11 @@ type Group struct {
 }
 
 func (s *GroupService) updateDatabase(group Group, status groupmodel.GroupStatus) error {
-	dump := status.ToMapInterface()
 
 	if group.DbID == "" {
 		//Fetch existing group status
 		criteria := make(map[string]interface{})
-		criteria["group"] = group.Runtime.Group
+		criteria["Group"] = group.Runtime.Group
 		groupStored, err := s.db.GetRecord(groupmodel.DbStatusName, groupmodel.TableStatusName, criteria)
 		if err == nil && groupStored != nil {
 			m := groupStored.(map[string]interface{})
@@ -54,11 +53,11 @@ func (s *GroupService) updateDatabase(group Group, status groupmodel.GroupStatus
 
 	if group.DbID != "" {
 		//Update existing group status
-		return s.db.UpdateRecord(groupmodel.DbStatusName, groupmodel.TableStatusName, group.DbID, dump)
+		return s.db.UpdateRecord(groupmodel.DbStatusName, groupmodel.TableStatusName, group.DbID, status)
 	}
 
 	//Create new group entry
-	grID, err := s.db.InsertRecord(groupmodel.DbStatusName, groupmodel.TableStatusName, dump)
+	grID, err := s.db.InsertRecord(groupmodel.DbStatusName, groupmodel.TableStatusName, status)
 	if err != nil {
 		group.DbID = grID
 	}
@@ -66,30 +65,31 @@ func (s *GroupService) updateDatabase(group Group, status groupmodel.GroupStatus
 }
 
 func (s *GroupService) dumpGroupStatus(group Group) error {
-	status := groupmodel.GroupStatus{}
-	status.Group = group.Runtime.Group
-	status.Auto = *group.Runtime.Auto
-	status.TimeToAuto = group.TimeToAuto
-	status.SensorRule = *group.Runtime.SensorRule
-	status.Error = group.Error
-	status.Presence = group.Presence
-	status.TimeToLeave = group.PresenceTimeout
-	status.CorrectionInterval = *group.Runtime.CorrectionInterval
-	status.SetpointLeds = group.Setpoint
-	status.SlopeStart = *group.Runtime.SlopeStart
-	status.SlopeStop = *group.Runtime.SlopeStop
-
 	var leds []string
 	for _, led := range group.Runtime.Leds {
 		leds = append(leds, led.Mac)
 	}
-	status.Leds = leds
 
 	var sensors []string
 	for _, sensor := range group.Runtime.Sensors {
 		sensors = append(sensors, sensor.Mac)
 	}
-	status.Sensors = sensors
+
+	status := groupmodel.GroupStatus{
+		Group:              group.Runtime.Group,
+		Auto:               *group.Runtime.Auto,
+		TimeToAuto:         group.TimeToAuto,
+		SensorRule:         *group.Runtime.SensorRule,
+		Error:              group.Error,
+		Presence:           group.Presence,
+		TimeToLeave:        group.PresenceTimeout,
+		CorrectionInterval: *group.Runtime.CorrectionInterval,
+		SetpointLeds:       group.Setpoint,
+		SlopeStart:         *group.Runtime.SlopeStart,
+		SlopeStop:          *group.Runtime.SlopeStop,
+		Leds:               leds,
+		Sensors:            sensors,
+	}
 
 	return s.updateDatabase(group, status)
 }
@@ -174,7 +174,7 @@ func (s *GroupService) computeSensorsValues(group *Group) {
 	var sensors []driversensor.Sensor
 	for _, sensor := range group.Runtime.Sensors {
 		criteria := make(map[string]interface{})
-		criteria["mac"] = sensor.Mac
+		criteria["Mac"] = sensor.Mac
 		sensorStored, err := s.db.GetRecord(driversensor.DbName, driversensor.TableName, criteria)
 		if err != nil || sensorStored == nil {
 			continue
@@ -298,7 +298,7 @@ func (s *GroupService) deleteGroup(group groupmodel.GroupRuntime) {
 
 	gr, _ := s.groups[group.Group]
 	if gr.DbID != "" {
-		s.db.DeleteRecord(groupmodel.DbStatusName, groupmodel.TableStatusName, gr.DbID)
+		s.db.DeleteRecord(groupmodel.DbStatusName, groupmodel.TableStatusName, gr)
 	}
 
 	delete(s.groups, group.Group)
