@@ -1,4 +1,4 @@
-Source: groupservice
+Source: COMPONENT
 Maintainer: Amandine Drebes <amandine@energie-ip.com>
 Section: misc
 Priority: optional
@@ -7,9 +7,9 @@ Build-Depends:
  golang-go (>= 1.9)
 Homepage: https://www.energie-ip.com/
 Vcs-Git: https://github.com/energieip/swh200-groupservice-go.git
-PackageName: groupservice
+PackageName: COMPONENT
 Architecture: amd64
 Depends: binutils, gzip, bzip2, xz-utils, mosquitto, rethinkdb
 Description: Group service management running on PoE switch
-Package: groupservice
+Package: COMPONENT
 Version: VERSION
