@@ -9,8 +9,8 @@ import (
 	"github.com/energieip/common-database-go/pkg/database"
 	gr "github.com/energieip/common-group-go/pkg/groupmodel"
 	"github.com/energieip/common-network-go/pkg/network"
+	pkg "github.com/energieip/common-service-go/pkg/service"
 	"github.com/energieip/common-tools-go/pkg/tools"
-	"github.com/energieip/swh200-groupservice-go/pkg/config"
 	"github.com/romana/rlog"
 )
 
@@ -68,7 +68,7 @@ func (s *GroupService) onRemove(client network.Client, msg network.Message) {
 	}
 }
 
-func (s *GroupService) prepareDatabase(conf *config.Configuration) error {
+func (s *GroupService) prepareDatabase(conf pkg.ServiceConfig) error {
 	db, err := database.NewDatabase(database.RETHINKDB)
 	if err != nil {
 		rlog.Error("database err " + err.Error())
@@ -76,8 +76,8 @@ func (s *GroupService) prepareDatabase(conf *config.Configuration) error {
 	}
 
 	confDb := database.DatabaseConfig{
-		IP:   conf.DatabaseIP,
-		Port: conf.DatabasePort,
+		IP:   conf.DB.ClientIP,
+		Port: conf.DB.ClientPort,
 	}
 	err = db.Initialize(confDb)
 	if err != nil {
@@ -98,7 +98,7 @@ func (s *GroupService) prepareDatabase(conf *config.Configuration) error {
 	return nil
 }
 
-func (s *GroupService) prepareNetwork(conf *config.Configuration) error {
+func (s *GroupService) prepareNetwork(conf pkg.ServiceConfig) error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		rlog.Error("Cannot read hostname " + err.Error())
@@ -107,7 +107,7 @@ func (s *GroupService) prepareNetwork(conf *config.Configuration) error {
 	clientID := "Group" + hostname
 	driversBroker, err := network.NewNetwork(network.MQTT)
 	if err != nil {
-		rlog.Error("Cannot connect to broker " + conf.DriversBrokerIP + " error: " + err.Error())
+		rlog.Error("Cannot connect to broker " + conf.LocalBroker.IP + " error: " + err.Error())
 		return err
 	}
 	s.broker = driversBroker
@@ -118,17 +118,17 @@ func (s *GroupService) prepareNetwork(conf *config.Configuration) error {
 	callbacks["/remove/switch/group/update/settings"] = s.onRemove
 
 	confDrivers := network.NetworkConfig{
-		IP:         conf.DriversBrokerIP,
-		Port:       conf.DriversBrokerPort,
+		IP:         conf.LocalBroker.IP,
+		Port:       conf.LocalBroker.Port,
 		ClientName: clientID,
 		Callbacks:  callbacks,
-		LogLevel:   *conf.LogLevel,
+		LogLevel:   conf.LogLevel,
 	}
 	err = driversBroker.Initialize(confDrivers)
 	if err != nil {
-		rlog.Error("Cannot connect to broker " + conf.DriversBrokerIP + " error: " + err.Error())
+		rlog.Error("Cannot connect to broker " + conf.LocalBroker.IP + " error: " + err.Error())
 	} else {
-		rlog.Info(clientID + " connected to drivers broker " + conf.DriversBrokerIP)
+		rlog.Info(clientID + " connected to drivers broker " + conf.LocalBroker.IP)
 	}
 	return err
 }
@@ -138,22 +138,22 @@ func (s *GroupService) Initialize(confFile string) error {
 	s.groups = make(map[int]Group, 0)
 	s.mac = strings.ToUpper(strings.Replace(tools.GetMac(), ":", "", -1))
 
-	conf, err := config.ReadConfig(confFile)
+	conf, err := pkg.ReadServiceConfig(confFile)
 	if err != nil {
 		rlog.Error("Cannot parse configuration file " + err.Error())
 		return err
 	}
-	os.Setenv("RLOG_LOG_LEVEL", *conf.LogLevel)
+	os.Setenv("RLOG_LOG_LEVEL", conf.LogLevel)
 	os.Setenv("RLOG_LOG_NOTIME", "yes")
 	rlog.UpdateEnv()
 	rlog.Info("Starting Group service")
 
-	err = s.prepareDatabase(conf)
+	err = s.prepareDatabase(*conf)
 	if err != nil {
 		return err
 	}
 
-	s.prepareNetwork(conf)
+	s.prepareNetwork(*conf)
 	if err != nil {
 		return err
 	}
