@@ -1,6 +1,12 @@
 Switch Service Management for groups
 ====================================
 
+Group Service is responsible for:
+* Receiving command and configuration from *Switch core Service*
+* Computing group behaviour
+* Storing Group status in database
+* Sending command to dedicated switch services (e.g.: Switch Led Service, etc.)
+
 Build Requirement: 
 * golang-go > 1.9
 * glide
