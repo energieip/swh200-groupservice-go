@@ -6,7 +6,7 @@ PartOf=rethinkdb.service network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/energieip-group -c /etc/energieip-group/config.json
+ExecStart=/usr/local/bin/energieip-swh200-group -c /etc/energieip-swh200-group/config.json
 KillMode=process
 PrivateTmp=true
 Restart=always

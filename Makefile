@@ -1,4 +1,4 @@
-COMPONENT=energieip-group
+COMPONENT=energieip-swh200-group
 
 BINARIES=bin/$(COMPONENT)-armhf bin/$(COMPONENT)-amd64
 
