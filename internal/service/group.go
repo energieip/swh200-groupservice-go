@@ -193,7 +193,7 @@ func (s *GroupService) computeSensorsValues(group *Group) {
 
 	//compute sensor values
 	presence := sensors[0].Presence
-	group.Brightness = sensors[0].Brigthness
+	group.Brightness = sensors[0].Brightness
 
 	for i, sensor := range sensors {
 		if i == 0 {
@@ -204,14 +204,14 @@ func (s *GroupService) computeSensorsValues(group *Group) {
 		}
 		switch *group.Runtime.SensorRule {
 		case groupmodel.SensorAverage:
-			group.Brightness += sensor.Brigthness / nbSensors
+			group.Brightness += sensor.Brightness / nbSensors
 		case groupmodel.SensorMax:
-			if group.Brightness < sensor.Brigthness {
-				group.Brightness = sensor.Brigthness
+			if group.Brightness < sensor.Brightness {
+				group.Brightness = sensor.Brightness
 			}
 		case groupmodel.SensorMin:
-			if group.Brightness > sensor.Brigthness {
-				group.Brightness = sensor.Brigthness
+			if group.Brightness > sensor.Brightness {
+				group.Brightness = sensor.Brightness
 			}
 		}
 	}
