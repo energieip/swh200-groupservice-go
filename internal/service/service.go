@@ -31,7 +31,8 @@ func (s *GroupService) onSetup(client network.Client, msg network.Message) {
 	}
 	for grID, group := range groups {
 		if _, ok := s.groups[grID]; ok {
-			rlog.Warn("Group " + strconv.Itoa(grID) + " already exists skip it")
+			rlog.Warn("Group " + strconv.Itoa(grID) + " already exists reload config")
+			s.reloadGroupConfig(grID, group)
 			continue
 		}
 		s.createGroup(group)
@@ -47,7 +48,8 @@ func (s *GroupService) onUpdate(client network.Client, msg network.Message) {
 	}
 	for grID, group := range groups {
 		if _, ok := s.groups[grID]; !ok {
-			rlog.Warn("Group " + strconv.Itoa(grID) + " not found skip it")
+			rlog.Warn("Group " + strconv.Itoa(grID) + " recreate it")
+			s.createGroup(group)
 			continue
 		}
 		s.reloadGroupConfig(grID, group)

@@ -110,6 +110,7 @@ func (s *GroupService) groupRun(group *Group) error {
 						group.updateConfig(e)
 
 					case EventManual:
+						rlog.Info("Received manual event ", group)
 						group.TimeToAuto = *group.Runtime.Watchdog
 						s.setpointLed(group)
 						s.dumpGroupStatus(*group)
