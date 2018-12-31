@@ -107,7 +107,6 @@ func (s *GroupService) groupRun(group *Group) error {
 						return
 
 					case EventChange:
-						rlog.Info("===== Received EventChange event ", e)
 						group.updateConfig(e)
 
 					case EventManual:
@@ -266,8 +265,8 @@ func (s *GroupService) setpointLed(group *Group) {
 		}
 		urlCmd := "/write/switch/led/update/settings"
 		conf := driverled.LedConf{
-			Mac:      led.Mac,
-			Setpoint: &group.Setpoint,
+			Mac:          led.Mac,
+			SetpointAuto: &group.Setpoint,
 		}
 		dump, err := conf.ToJSON()
 		if err != nil {
