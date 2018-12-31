@@ -52,6 +52,7 @@ func (s *GroupService) onUpdate(client network.Client, msg network.Message) {
 			s.createGroup(group)
 			continue
 		}
+		rlog.Warn("Group " + strconv.Itoa(grID) + " reload it")
 		s.reloadGroupConfig(grID, group)
 	}
 }

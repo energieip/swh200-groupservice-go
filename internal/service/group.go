@@ -107,6 +107,7 @@ func (s *GroupService) groupRun(group *Group) error {
 						return
 
 					case EventChange:
+						rlog.Info("===== Received EventChange event ", e)
 						group.updateConfig(e)
 
 					case EventManual:
@@ -315,18 +316,20 @@ func (gr *Group) updateConfig(new *groupmodel.GroupRuntime) {
 	if new == nil {
 		return
 	}
-	if new.Auto != nil {
-		gr.Runtime.Auto = new.Auto
 
-		if *gr.Runtime.Auto == false && new.Setpoints != nil {
-			if new.Setpoints.SpLeds != nil {
-				gr.NewSetpoint = *new.Setpoints.SpLeds
-				event := make(map[string]*groupmodel.GroupRuntime)
-				event[EventManual] = nil
-				gr.Event <- event
-			}
-		}
+	if new.Auto != gr.Runtime.Auto {
+		gr.Runtime.Auto = new.Auto
 	}
+
+	if gr.Runtime.Auto != nil && *gr.Runtime.Auto == false && new.SetpointLeds != nil {
+		go func() {
+			gr.NewSetpoint = *new.SetpointLeds
+			event := make(map[string]*groupmodel.GroupRuntime)
+			event[EventManual] = nil
+			gr.Event <- event
+		}()
+	}
+
 	if new.CorrectionInterval != nil {
 		gr.Runtime.CorrectionInterval = new.CorrectionInterval
 	}
