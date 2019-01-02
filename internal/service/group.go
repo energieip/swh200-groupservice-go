@@ -18,8 +18,8 @@ const (
 
 // Group logical
 type Group struct {
-	Event           chan map[string]*groupmodel.GroupRuntime
-	Runtime         groupmodel.GroupRuntime
+	Event           chan map[string]*groupmodel.GroupConfig
+	Runtime         groupmodel.GroupConfig
 	NewSetpoint     int
 	Setpoint        int
 	Brightness      int
@@ -32,63 +32,53 @@ type Group struct {
 	Error           int
 }
 
-func (s *GroupService) updateDatabase(group Group, status groupmodel.GroupStatus) error {
-
-	if group.DbID == "" {
-		//Fetch existing group status
-		criteria := make(map[string]interface{})
-		criteria["Group"] = group.Runtime.Group
-		groupStored, err := s.db.GetRecord(groupmodel.DbStatusName, groupmodel.TableStatusName, criteria)
-		if err == nil && groupStored != nil {
-			m := groupStored.(map[string]interface{})
-			id, ok := m["id"]
-			if !ok {
-				id, ok = m["ID"]
-			}
-			if ok {
-				group.DbID = id.(string)
-			}
-		}
-	}
-
-	if group.DbID != "" {
-		//Update existing group status
-		return s.db.UpdateRecord(groupmodel.DbStatusName, groupmodel.TableStatusName, group.DbID, status)
-	}
-
-	//Create new group entry
-	grID, err := s.db.InsertRecord(groupmodel.DbStatusName, groupmodel.TableStatusName, status)
-	if err != nil {
-		group.DbID = grID
-	}
-	return err
-}
-
 func (s *GroupService) dumpGroupStatus(group Group) error {
-	var leds []string
-	for _, led := range group.Runtime.Leds {
-		leds = append(leds, led.Mac)
+	name := ""
+	if group.Runtime.FriendlyName != nil {
+		name = *group.Runtime.FriendlyName
 	}
-
-	var sensors []string
-	for _, sensor := range group.Runtime.Sensors {
-		sensors = append(sensors, sensor.Mac)
+	correctionInterval := 1
+	if group.Runtime.CorrectionInterval != nil {
+		correctionInterval = *group.Runtime.CorrectionInterval
 	}
-
+	auto := false
+	if group.Runtime.Auto != nil {
+		auto = *group.Runtime.Auto
+	}
+	slopeStart := 0
+	slopeStop := 0
+	if group.Runtime.SlopeStart != nil {
+		slopeStart = *group.Runtime.SlopeStart
+	}
+	if group.Runtime.SlopeStop != nil {
+		slopeStop = *group.Runtime.SlopeStop
+	}
+	sensorRule := groupmodel.SensorAverage
+	if group.Runtime.SensorRule != nil {
+		sensorRule = *group.Runtime.SensorRule
+	}
+	watchdog := 0
+	if group.Runtime.Watchdog != nil {
+		watchdog = *group.Runtime.Watchdog
+	}
 	status := groupmodel.GroupStatus{
 		Group:              group.Runtime.Group,
-		Auto:               *group.Runtime.Auto,
+		Auto:               auto,
 		TimeToAuto:         group.TimeToAuto,
-		SensorRule:         *group.Runtime.SensorRule,
+		SensorRule:         sensorRule,
 		Error:              group.Error,
 		Presence:           group.Presence,
 		TimeToLeave:        group.PresenceTimeout,
-		CorrectionInterval: *group.Runtime.CorrectionInterval,
+		CorrectionInterval: correctionInterval,
 		SetpointLeds:       group.Setpoint,
-		SlopeStart:         *group.Runtime.SlopeStart,
-		SlopeStop:          *group.Runtime.SlopeStop,
-		Leds:               leds,
-		Sensors:            sensors,
+		SlopeStart:         slopeStart,
+		SlopeStop:          slopeStop,
+		Leds:               group.Runtime.Leds,
+		Sensors:            group.Runtime.Sensors,
+		RuleBrightness:     group.Runtime.RuleBrightness,
+		RulePresence:       group.Runtime.RulePresence,
+		Watchdog:           watchdog,
+		FriendlyName:       name,
 	}
 
 	return s.updateDatabase(group, status)
@@ -111,6 +101,7 @@ func (s *GroupService) groupRun(group *Group) error {
 
 					case EventManual:
 						rlog.Info("Received manual event ", group)
+						group.Slope = 0
 						group.TimeToAuto = *group.Runtime.Watchdog
 						s.setpointLed(group)
 						s.dumpGroupStatus(*group)
@@ -119,19 +110,23 @@ func (s *GroupService) groupRun(group *Group) error {
 			case <-ticker.C:
 				counter++
 				// compute timetoAuto and switch back to Auto mode
-				if group.TimeToAuto <= 0 {
+				if group.TimeToAuto <= 0 && (group.Runtime.Auto == nil || *group.Runtime.Auto == false) {
 					auto := true
 					group.Runtime.Auto = &auto
+					rlog.Info("Switch group " + strconv.Itoa(group.Runtime.Group) + " back to Automatic mode")
 				}
 				if group.TimeToAuto > 0 {
 					group.TimeToAuto--
 				}
-				if counter == *group.Runtime.CorrectionInterval {
-					if *group.Runtime.Auto == true && group.Slope == 0 {
-						s.computeSensorsValues(group)
+
+				// Do not wait for correction interval to re-adjust the sensor values
+				s.computeSensorsValues(group)
+
+				if group.Runtime.CorrectionInterval == nil || counter == *group.Runtime.CorrectionInterval {
+					if (group.Runtime.Auto != nil && *group.Runtime.Auto == true) && group.Slope == 0 {
 						if group.Presence {
-							if group.Runtime.GroupRules.Brightness != nil {
-								readBrightness := *group.Runtime.GroupRules.Brightness
+							if group.Runtime.RuleBrightness != nil {
+								readBrightness := *group.Runtime.RuleBrightness
 								if group.Brightness > readBrightness {
 									group.NewSetpoint = group.Setpoint - group.Scale
 									if group.NewSetpoint < 0 {
@@ -149,6 +144,7 @@ func (s *GroupService) groupRun(group *Group) error {
 							}
 						} else {
 							//empty room
+							rlog.Info("Room is now empty for group", strconv.Itoa(group.Runtime.Group))
 							group.NewSetpoint = 0
 							group.Slope = *group.Runtime.SlopeStop
 						}
@@ -175,7 +171,7 @@ func (s *GroupService) computeSensorsValues(group *Group) {
 	var sensors []driversensor.Sensor
 	for _, sensor := range group.Runtime.Sensors {
 		criteria := make(map[string]interface{})
-		criteria["Mac"] = sensor.Mac
+		criteria["Mac"] = sensor
 		sensorStored, err := s.db.GetRecord(driversensor.DbName, driversensor.TableName, criteria)
 		if err != nil || sensorStored == nil {
 			continue
@@ -218,11 +214,10 @@ func (s *GroupService) computeSensorsValues(group *Group) {
 	}
 
 	// manage presence group timeout
-	if group.Runtime.GroupRules.Presence != nil {
+	if group.Runtime.RulePresence != nil {
 		if !presence {
-			//TODO fix presence timeout: don't wait correctionInterval
 			if group.PresenceTimeout <= 0 {
-				group.PresenceTimeout = *group.Runtime.GroupRules.Presence
+				group.PresenceTimeout = *group.Runtime.RulePresence
 			} else {
 				group.PresenceTimeout--
 			}
@@ -259,13 +254,9 @@ func (s *GroupService) setpointLed(group *Group) {
 	rlog.Info("Set brightness now to " + strconv.Itoa(group.Setpoint) + " , Remaining time " + strconv.Itoa(group.Slope))
 
 	for _, led := range group.Runtime.Leds {
-		if led.SwitchMac != s.mac {
-			rlog.Info("Switch mac is " + s.mac + " and led is connected to switch " + led.SwitchMac + " skip it")
-			continue
-		}
 		urlCmd := "/write/switch/led/update/settings"
 		conf := driverled.LedConf{
-			Mac:          led.Mac,
+			Mac:          led,
 			SetpointAuto: &group.Setpoint,
 		}
 		dump, err := conf.ToJSON()
@@ -277,9 +268,13 @@ func (s *GroupService) setpointLed(group *Group) {
 	}
 }
 
-func (s *GroupService) createGroup(runtime groupmodel.GroupRuntime) {
+func (s *GroupService) createGroup(runtime groupmodel.GroupConfig) {
+	if runtime.Auto == nil {
+		auto := true
+		runtime.Auto = &auto
+	}
 	group := Group{
-		Event:   make(chan map[string]*groupmodel.GroupRuntime),
+		Event:   make(chan map[string]*groupmodel.GroupConfig),
 		Runtime: runtime,
 		Scale:   10,
 	}
@@ -287,13 +282,13 @@ func (s *GroupService) createGroup(runtime groupmodel.GroupRuntime) {
 	s.groupRun(&group)
 }
 
-func (s *GroupService) stopGroup(group groupmodel.GroupRuntime) {
-	event := make(map[string]*groupmodel.GroupRuntime)
+func (s *GroupService) stopGroup(group groupmodel.GroupConfig) {
+	event := make(map[string]*groupmodel.GroupConfig)
 	event[EventStop] = nil
 	s.groups[group.Group].Event <- event
 }
 
-func (s *GroupService) deleteGroup(group groupmodel.GroupRuntime) {
+func (s *GroupService) deleteGroup(group groupmodel.GroupConfig) {
 	s.stopGroup(group)
 	time.Sleep(time.Second)
 
@@ -305,17 +300,16 @@ func (s *GroupService) deleteGroup(group groupmodel.GroupRuntime) {
 	delete(s.groups, group.Group)
 }
 
-func (s *GroupService) reloadGroupConfig(groupID int, newconfig groupmodel.GroupRuntime) {
-	event := make(map[string]*groupmodel.GroupRuntime)
+func (s *GroupService) reloadGroupConfig(groupID int, newconfig groupmodel.GroupConfig) {
+	event := make(map[string]*groupmodel.GroupConfig)
 	event[EventChange] = &newconfig
 	s.groups[groupID].Event <- event
 }
 
-func (gr *Group) updateConfig(new *groupmodel.GroupRuntime) {
+func (gr *Group) updateConfig(new *groupmodel.GroupConfig) {
 	if new == nil {
 		return
 	}
-
 	if new.Auto != gr.Runtime.Auto {
 		gr.Runtime.Auto = new.Auto
 	}
@@ -323,7 +317,7 @@ func (gr *Group) updateConfig(new *groupmodel.GroupRuntime) {
 	if gr.Runtime.Auto != nil && *gr.Runtime.Auto == false && new.SetpointLeds != nil {
 		go func() {
 			gr.NewSetpoint = *new.SetpointLeds
-			event := make(map[string]*groupmodel.GroupRuntime)
+			event := make(map[string]*groupmodel.GroupConfig)
 			event[EventManual] = nil
 			gr.Event <- event
 		}()
@@ -347,16 +341,19 @@ func (gr *Group) updateConfig(new *groupmodel.GroupRuntime) {
 	if new.SlopeStop != nil {
 		gr.Runtime.SlopeStop = new.SlopeStop
 	}
-	if new.GroupRules != nil {
-		if gr.Runtime.GroupRules == nil {
-			rules := groupmodel.Rule{}
-			gr.Runtime.GroupRules = &rules
-		}
-		if new.GroupRules.Brightness != nil {
-			gr.Runtime.GroupRules.Brightness = new.GroupRules.Brightness
-		}
-		if new.GroupRules.Presence != nil {
-			gr.Runtime.GroupRules.Presence = new.GroupRules.Presence
-		}
+	if new.RuleBrightness != nil {
+		gr.Runtime.RuleBrightness = new.RuleBrightness
+	}
+	if new.RulePresence != nil {
+		gr.Runtime.RulePresence = new.RulePresence
+	}
+	if new.FriendlyName != nil {
+		gr.Runtime.FriendlyName = new.FriendlyName
+	}
+	if new.SensorRule != nil {
+		gr.Runtime.SensorRule = new.SensorRule
+	}
+	if new.Watchdog != nil {
+		gr.Runtime.Watchdog = new.Watchdog
 	}
 }
