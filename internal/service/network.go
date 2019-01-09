@@ -62,11 +62,15 @@ func (s *GroupService) prepareNetwork(conf pkg.ServiceConfig) error {
 	callbacks["/remove/switch/group/update/settings"] = s.onRemove
 
 	confDrivers := network.NetworkConfig{
-		IP:         conf.LocalBroker.IP,
-		Port:       conf.LocalBroker.Port,
-		ClientName: clientID,
-		Callbacks:  callbacks,
-		LogLevel:   conf.LogLevel,
+		IP:               conf.LocalBroker.IP,
+		Port:             conf.LocalBroker.Port,
+		ClientName:       clientID,
+		Callbacks:        callbacks,
+		LogLevel:         conf.LogLevel,
+		User:             conf.LocalBroker.Login,
+		Password:         conf.LocalBroker.Password,
+		ClientKey:        conf.LocalBroker.KeyPath,
+		ServerCertificat: conf.LocalBroker.CaPath,
 	}
 	err = driversBroker.Initialize(confDrivers)
 	if err != nil {

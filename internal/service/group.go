@@ -101,7 +101,6 @@ func (s *GroupService) groupRun(group *Group) error {
 
 					case EventManual:
 						rlog.Info("Received manual event ", group)
-						group.Slope = 0
 						group.TimeToAuto = *group.Runtime.Watchdog
 						s.setpointLed(group)
 						s.dumpGroupStatus(*group)
