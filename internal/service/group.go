@@ -171,7 +171,7 @@ func (s *GroupService) computeSensorsValues(group *Group) {
 	for _, sensor := range group.Runtime.Sensors {
 		criteria := make(map[string]interface{})
 		criteria["Mac"] = sensor
-		sensorStored, err := s.db.GetRecord(driversensor.DbName, driversensor.TableName, criteria)
+		sensorStored, err := s.db.GetRecord(driversensor.DbStatus, driversensor.TableName, criteria)
 		if err != nil || sensorStored == nil {
 			continue
 		}
